@@ -1,51 +1,55 @@
 # Algorithm Principles
 
-## Objective
-For a user-defined wake window [earliest, latest], estimate for each candidate wake time t:
+## Decision framing
 
-P(wake at t is sufficiently restorative and acceptable | current night, recent history, personal model, context)
+For a configured interval `W = [floor, deadline]`, select a wake action only if it satisfies hard safety constraints and has adequate evidence of acceptable function. This is a constrained decision under uncertainty, not an optimization of “earliest alarm,” a score lookup or a sleep-cycle calculator.
 
-Choose the earliest candidate whose posterior probability and safety constraints satisfy product policy.
+`action(t) = wake at t`, for `t in W`; fallback is a deterministic alarm at `deadline`.
 
-This is a probabilistic decision problem, not a sleep-score lookup.
+The candidate decision requires a conservative posterior/credible lower bound for acceptable function, not merely a high point estimate. Exact probability thresholds are deliberately unassigned until outcome data and false-early-wake harm weighting are validated.
 
-## Latent dimensions
-Maintain separate estimates of:
-1. Sleep Sufficiency
-2. Recent Recovery / Sleep Pressure
-3. Physiological Stability
-4. Circadian Readiness
-5. Wake Readiness
-6. Uncertainty / Confidence
+## Separate latent state estimates
 
-Do not collapse them prematurely into one opaque score.
+Keep the following estimates distinct and versioned. Each carries a range/distribution, evidence provenance and confidence—not a deceptive exact scalar.
 
-## Decision logic
-1. Establish hard bounds.
-2. Estimate current sleep opportunity and recent history.
-3. Update personal baseline deviations.
-4. Estimate candidate wake readiness over the allowed window.
-5. Use stage information only as a secondary signal.
-6. Calculate confidence.
-7. Select earliest candidate meeting safety criteria.
-8. If confidence is inadequate, use conservative fallback behavior.
-9. Log the decision and inputs.
-10. Collect outcomes and update slowly.
+1. **Sleep sufficiency:** protected personal opportunity range versus observed estimated opportunity; never equate low habitual duration with need.
+2. **Recent recovery / sleep pressure:** recent short-night/recovery pattern and time-awake context; it is a proxy, not quantified debt in hours.
+3. **Regularity:** deviation from the user’s established schedule distribution, interpreted as an association-aware longitudinal guardrail.
+4. **Physiological stability:** baseline-relative, quality-gated HR/HRV/respiration/movement context; nonspecific and unable to decide alone.
+5. **Circadian readiness:** timing proxy from schedule/local time/context, explicitly not measured biological phase unless validated instrumentation exists.
+6. **Wake readiness / sleep inertia:** predicted short-term wake difficulty and functional state; an outcome target to validate, not an assumed capability.
+7. **Stage estimate:** optional uncertain tie-breaker only after 1–6 and hard constraints pass.
+8. **Decision confidence:** model/data support, missingness, staleness, disagreement, extrapolation and system health.
 
-## Learning
-Learn individual sleep-duration distribution, response to restriction, relationship between physiology and next-day function, wake difficulty and regularity.
+## Architecture: safety envelope + interpretable model
 
-Do not learn from subjective comfort alone. Pair subjective feedback with objective or behavioral outcomes when possible.
+### Layer 0 — configuration and reliability
+Validate time bounds, permissions, clock/time zone, supported device/version and a scheduled deadline fallback. If this fails, adaptive mode is unavailable.
 
-## Validation
-Primary endpoints: reaction time / cognitive performance, wake difficulty, daytime sleepiness, functional energy, adherence to intended schedule.
+### Layer 1 — non-negotiable safety envelope
+Reject a candidate outside the window, in a low-confidence state, or when recent restriction/insufficient protected opportunity/critical data quality makes an earlier wake unacceptable. This layer cannot be bypassed by personalization.
 
-Safety endpoints: repeated restriction, increasing sleep debt, worsening regularity, sustained physiological deterioration and persistent daytime impairment.
+### Layer 2 — feature construction
+Build timestamped, quality-labelled feature ranges from current signals, multi-night history, context and baseline deviation. Do not impute missing physiology as normal; record missingness itself.
 
-## Model evolution
-1. Rule-based safety layer.
-2. Interpretable probabilistic model.
-3. Personalized hierarchical model.
-4. More complex ML only if it improves out-of-sample outcomes and remains auditable.
+### Layer 3 — candidate prediction
+At each supported candidate time, estimate outcome distributions for pre-specified endpoints: wake difficulty, next-day reaction-time result, daytime sleepiness/energy and regularity impact. Begin with transparent monotonic/regularized models and calibration checks. A hierarchical model may pool information while preserving individual uncertainty; it must not silently impose population thresholds as personal truth.
 
-Never optimize directly for "earliest alarm". Optimize safe functioning and long-term outcomes.
+### Layer 4 — conservative selection
+From candidates that pass Layer 1, choose the earliest one whose conservative evidence meets the policy. If none qualifies or confidence is inadequate, retain the deadline fallback. Stage may resolve a near-tie only if it cannot change a safety outcome.
+
+### Layer 5 — audit and slow learning
+Persist feature snapshot, versions, candidates, uncertainty, chosen action, fallback state, overrides and outcomes. Update only after delayed, quality-checked outcome data. Separate exploration from autonomous wake decisions; no unbounded or rapid sleep-shortening learning.
+
+## Learning safeguards
+
+- Establish a no-advancement baseline collection period.
+- Use within-person comparisons with calendar/context controls and practice-adjusted cognitive tests where feasible.
+- Treat missing feedback and overrides as informative but not proof of poor/good sleep.
+- Monitor calibration separately across normal, travel, illness, alcohol, training and shift-like contexts.
+- Version models and permit rollback; never overwrite historical decision context.
+- A claim of improvement needs prospective out-of-sample evidence against fixed conservative alarms, not only retrospective fit.
+
+## Explicit unknowns
+
+The quantitative mapping from Garmin-derived data to “safe effective wake moment,” an acceptable probability threshold, minimum data history, and the incremental utility of staging remain unknown. These are feasibility/validation questions, not implementation assumptions.

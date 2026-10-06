@@ -1,35 +1,49 @@
 # Garmin Architecture
 
-## Official integration options
+## Verification status
 
-Garmin Health API exposes all-day health data including sleep, heart rate, stress, respiration and Body Battery. Data become available after device sync to Garmin Connect. Commercial use requires Garmin program/licensing arrangements.
+Official-source URLs are in `RESEARCH/bibliography.md`, but the GitHub-CLI-only acquisition constraint prevented direct reading of the current Garmin contracts in this pass. Statements labelled **to verify** are design hypotheses/gates, not facts suitable for implementation.
 
-https://developer.garmin.com/gc-developer-program/health-api/
+## Candidate integration tracks
 
-Garmin Health SDKs are enterprise-oriented and support real-time streaming/configurable logged data, with commercial licensing requirements.
+### Track A — Garmin Health API (post-sync / cloud)
 
-https://developer.garmin.com/health-sdk/
-https://developer.garmin.com/health-sdk/questions-answers/
+Repository source: Garmin Health API. **To verify:** commercial eligibility/licensing, data scopes, retention, latency, supported metrics/models, webhook/poll semantics and whether data are available soon enough for a wake decision.
 
-Connect IQ apps can communicate with a phone over BLE through Toybox.Communications. Background services exist but can be constrained or terminated.
+Design consequence: do not assume cloud data have real-time latency. This track is potentially suitable for longitudinal history and retrospective analysis, not a relied-on last-minute alarm path until latency is measured on target devices.
 
-https://developer.garmin.com/connect-iq/api-docs/Toybox/Communications.html
-https://developer.garmin.com/connect-iq/articles/core-topics/Backgrounding.html
-https://developer.garmin.com/connect-iq/api-docs/Toybox/System/ServiceDelegate.html
+### Track B — Garmin Health SDK (licensed direct/real-time option)
 
-## Architectural consequence
-Do not assume Garmin Connect cloud data can provide sufficiently low-latency night data for a consumer real-time alarm.
+Repository source: Garmin Health SDK. **To verify:** commercial contract, iOS compatibility, actual signal set, sampling/latency, background behavior, model list and failure semantics.
 
-Investigate two tracks:
-A. Connect IQ companion architecture where the watch participates directly in the night decision and sends compact events to iPhone.
-B. Garmin Health SDK / licensed enterprise architecture if real-time access is required.
+Design consequence: this is a feasibility gate; do not architect against undocumented streaming guarantees.
 
-## Constraints
-Background services can be time/event driven and may be terminated. BLE bandwidth is limited. Prefer compact features/events over raw streaming.
+### Track C — Connect IQ watch app + phone companion
 
-## Critical R&D questions
-1. Can the target Garmin model expose the required overnight signals to Connect IQ?
-2. Can the watch execute the required inference during the target night?
-3. Can it reliably notify the iPhone at the chosen wake moment?
-4. What happens when the watch is disconnected?
-5. Which Garmin model(s) are supported for V1?
+Repository sources: Connect IQ `Toybox.Communications`, backgrounding and `ServiceDelegate`. **To verify on exact model/firmware:** which overnight signals are exposed to Connect IQ; whether background services are scheduled/terminated; transport wake-up/delivery behavior; resource limits; and iOS companion interoperability.
+
+Design consequence: compact, timestamped events/features are preferred to raw continuous data. Watch-side execution cannot be assumed to persist or deliver at the desired moment.
+
+## Prohibited assumptions
+
+- Garmin Connect cloud data are real-time enough for an alarm.
+- Garmin sleep stages are PSG or available with useful immediate latency.
+- A Garmin proprietary score is a validated wake-readiness signal.
+- A watch-to-phone event will always arrive at the deadline.
+- One Garmin model/firmware result generalizes to all Garmin devices.
+
+## Night protocol (only after feasibility proof)
+
+1. Before sleep, iPhone validates pairing/support state and schedules its own deadline fallback.
+2. Garmin/companion emits only schema-versioned events with device, firmware, monotonic and wall-clock timestamps, freshness, quality and sequence identifiers.
+3. iPhone rejects stale, duplicated, malformed or unsupported events.
+4. A decision event can propose a candidate inside the user’s window but cannot cancel the deadline fallback until the phone has durably acknowledged the selected alarm state.
+5. Disconnect or degraded quality moves the system to conservative fallback; it never produces an earlier wake.
+
+## Required feasibility matrix before V1 selection
+
+For every target watch, firmware and iPhone/iOS combination, measure: signal availability; event latency distribution; overnight battery effect; disconnect/reconnect behavior; transport reliability through the configured wake window; behavior after phone/watch app termination; data schema/version drift; and alarm outcome under fault injection. Publish pass criteria before collecting adaptive effectiveness data.
+
+## Data boundary
+
+Collect only signals justified by a documented research question. Store source layer and vendor/device/firmware metadata to make algorithm drift detectable. Garmin-derived data are estimates, not clinical measurements.
